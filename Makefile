@@ -32,4 +32,5 @@ logout:
 
 .PHONY: bpf_check
 bpf_check: dataplane
+	sudo rm /sys/fs/bpf/test
 	sudo /usr/lib/linux-tools/6.8.0-106-generic/bpftool prog load pkg/dataplane/bpf/bpf_bpfel.o /sys/fs/bpf/test

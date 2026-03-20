@@ -10,11 +10,16 @@
 // others
 // ...
 
+// ETHERNET
 #define ETH_P_8021Q 0x8100  /* 802.1Q VLAN Extended Header  */
 #define ETH_P_8021AD 0x88A8 /* 802.1ad Service VLAN		*/
 #define ETH_P_ARP 0x0806    /* Address Resolution packet	*/
 #define ETH_P_IP 0x0800     /* Internet Protocol packet	*/
 #define ETH_P_IPV6 0x86DD   /* IPv6 over bluebook		*/
+
+// ARP
+#define ARPOP_REQUEST 1 /* ARP request.  */
+#define ARPOP_REPLY 2   /* ARP reply.  */
 
 static __always_inline bool ethernet_ethhdr(struct xdp_md *ctx,
                                             struct ethhdr **eth_out) {
@@ -66,6 +71,22 @@ static __always_inline bool ethernet_arp_hdr(struct xdp_md *ctx,
   }
 
   *arphdr_out = arphdr;
+  return true;
+}
+
+static __always_inline bool proto_payload(struct xdp_md *ctx, void *payload,
+                                          __u32 payload_size,
+                                          void **payload_out) {
+  void *data_end = (void *)(long)ctx->data_end;
+  if (payload > data_end) {
+    return false;
+  }
+
+  if (payload + payload_size > data_end) {
+    return false;
+  }
+
+  *payload_out = payload;
   return true;
 }
 

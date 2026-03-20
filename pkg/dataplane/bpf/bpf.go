@@ -1,6 +1,7 @@
 package dataplane
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -36,6 +37,23 @@ func Agent() {
 		log.Fatalf("loading objects: %s", err.Error())
 	}
 	defer objs.Close()
+
+	// Update map
+	var config bpfBpfConfig
+	copy(config.NodeMac[:], iface.HardwareAddr)
+	addrs, _ := iface.Addrs()
+	var nodeIP uint32
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+			nodeIP = binary.LittleEndian.Uint32(ipnet.IP.To4())
+			break
+		}
+	}
+	config.NodeIp = nodeIP
+
+	if err := objs.ConfigMap.Update(uint32(0), &config, ebpf.UpdateAny); err != nil {
+		log.Fatalf("failed to pre-configure map: %v", err)
+	}
 
 	// Attach the program.
 	l, err := link.AttachXDP(link.XDPOptions{

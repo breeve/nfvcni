@@ -8,9 +8,17 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"structs"
 
 	"github.com/cilium/ebpf"
 )
+
+type bpfBpfConfig struct {
+	_       structs.HostLayout
+	NodeMac [6]uint8
+	_       [2]byte
+	NodeIp  uint32
+}
 
 // loadBpf returns the embedded CollectionSpec for bpf.
 func loadBpf() (*ebpf.CollectionSpec, error) {
@@ -61,6 +69,7 @@ type bpfProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
+	ConfigMap   *ebpf.MapSpec `ebpf:"config_map"`
 	XdpStatsMap *ebpf.MapSpec `ebpf:"xdp_stats_map"`
 }
 
@@ -90,11 +99,13 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
+	ConfigMap   *ebpf.Map `ebpf:"config_map"`
 	XdpStatsMap *ebpf.Map `ebpf:"xdp_stats_map"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
+		m.ConfigMap,
 		m.XdpStatsMap,
 	)
 }
