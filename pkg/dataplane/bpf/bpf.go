@@ -27,8 +27,13 @@ func Agent() {
 
 	// Load pre-compiled programs into the kernel.
 	objs := bpfObjects{}
-	if err := loadBpfObjects(&objs, nil); err != nil {
-		log.Fatalf("loading objects: %s", err)
+	if err := loadBpfObjects(&objs, &ebpf.CollectionOptions{
+		Programs: ebpf.ProgramOptions{
+			LogLevel:     ebpf.LogLevelInstruction,
+			LogSizeStart: 512 * 1024,
+		},
+	}); err != nil {
+		log.Fatalf("loading objects: %s", err.Error())
 	}
 	defer objs.Close()
 

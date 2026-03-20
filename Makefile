@@ -29,3 +29,7 @@ dataplane: dataplane_bpf
 .PHONY: logout
 logout:
 	sudo /usr/lib/linux-tools/6.8.0-106-generic/bpftool prog tracelog
+
+.PHONY: bpf_check
+bpf_check: dataplane
+	sudo /usr/lib/linux-tools/6.8.0-106-generic/bpftool prog load pkg/dataplane/bpf/bpf_bpfel.o /sys/fs/bpf/test
