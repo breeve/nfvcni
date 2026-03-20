@@ -54,14 +54,14 @@ type bpfSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfProgramSpecs struct {
-	CountMkdir *ebpf.ProgramSpec `ebpf:"count_mkdir"`
+	XdpProgFunc *ebpf.ProgramSpec `ebpf:"xdp_prog_func"`
 }
 
 // bpfMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	KprobeMap *ebpf.MapSpec `ebpf:"kprobe_map"`
+	XdpStatsMap *ebpf.MapSpec `ebpf:"xdp_stats_map"`
 }
 
 // bpfVariableSpecs contains global variables before they are loaded into the kernel.
@@ -90,12 +90,12 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	KprobeMap *ebpf.Map `ebpf:"kprobe_map"`
+	XdpStatsMap *ebpf.Map `ebpf:"xdp_stats_map"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
-		m.KprobeMap,
+		m.XdpStatsMap,
 	)
 }
 
@@ -109,12 +109,12 @@ type bpfVariables struct {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfPrograms struct {
-	CountMkdir *ebpf.Program `ebpf:"count_mkdir"`
+	XdpProgFunc *ebpf.Program `ebpf:"xdp_prog_func"`
 }
 
 func (p *bpfPrograms) Close() error {
 	return _BpfClose(
-		p.CountMkdir,
+		p.XdpProgFunc,
 	)
 }
 

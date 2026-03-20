@@ -1,0 +1,16 @@
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "/usr/include/x86_64-linux-gnu",
+        "${workspaceFolder}/dataplane/header"
+      ],
+      "defines": ["__BPF_TRACING__", "__TARGET_ARCH_x86"],
+      "compilerPath": "/usr/bin/clang",
+      "cStandard": "c11"
+    }
+  ],
+  "version": 4
+}

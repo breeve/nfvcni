@@ -5,7 +5,7 @@ bpf2go:
 
 .PHONY: cc
 cc:
-	sudo apt install clang llvm libbpf-dev libelf-dev zlib1g-dev linux-tools-common linux-tools-generic
+	sudo apt install clang llvm libbpf-dev libelf-dev zlib1g-dev linux-tools-common linux-tools-generic bear
 
 .PHONY: cc_wsl
 cc_wsl:
@@ -13,13 +13,13 @@ cc_wsl:
 
 .PHONY: gateway_dataplane_vmlinux_h
 gateway_dataplane_vmlinux_h:
-	/usr/lib/linux-tools/6.8.0-106-generic/bpftool btf dump file /sys/kernel/btf/vmlinux format c > pkg/dataplane/bpf/vmlinux.h
+	/usr/lib/linux-tools/6.8.0-106-generic/bpftool btf dump file /sys/kernel/btf/vmlinux format c > pkg/dataplane/bpf/header/vmlinux.h
 	
 .PHONY: deps
-deps: bpf2go cc cc_wsl gateway_dataplane_vmlinux_h
+deps: bpf2go cc cc_wsl
 
 .PHONY: dataplane_bpf
-dataplane_bpf:
+dataplane_bpf: gateway_dataplane_vmlinux_h
 	cd  pkg/dataplane/bpf; go generate
 
 .PHONY: dataplane

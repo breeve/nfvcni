@@ -3,43 +3,72 @@ package dataplane
 import (
 	"fmt"
 	"log"
+	"net"
+	"net/netip"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/rlimit"
 )
 
 func Agent() {
-	// 1. 移除内核对内存锁定的限制（eBPF 程序需要固定内存）
-	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatal(err)
+	if len(os.Args) < 2 {
+		log.Fatalf("Please specify a network interface")
 	}
 
-	// 2. 加载生成的 eBPF 字节码到内核
+	// Look up the network interface by name.
+	ifaceName := os.Args[1]
+	iface, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		log.Fatalf("lookup network iface %q: %s", ifaceName, err)
+	}
+
+	// Load pre-compiled programs into the kernel.
 	objs := bpfObjects{}
 	if err := loadBpfObjects(&objs, nil); err != nil {
-		log.Fatalf("loading objects: %v", err)
+		log.Fatalf("loading objects: %s", err)
 	}
 	defer objs.Close()
 
-	// 3. 将 eBPF 程序挂载到内核的 mkdir 系统调用入口
-	// 注意：现代内核通常使用 __x64_sys_mkdir 或类似的符号
-	kp, err := link.Kprobe("sys_mkdir", objs.CountMkdir, nil)
+	// Attach the program.
+	l, err := link.AttachXDP(link.XDPOptions{
+		Program:   objs.XdpProgFunc,
+		Interface: iface.Index,
+	})
 	if err != nil {
-		log.Fatalf("opening kprobe: %v", err)
+		log.Fatalf("could not attach XDP program: %s", err)
 	}
-	defer kp.Close()
+	defer l.Close()
 
-	fmt.Println("正在监控 mkdir 调用... 按 Ctrl+C 退出")
+	log.Printf("Attached XDP program to iface %q (index %d)", iface.Name, iface.Index)
+	log.Printf("Press Ctrl-C to exit and remove the program")
 
-	// 4. 定期从 Map 中读取计数
+	// Print the contents of the BPF hash map (source IP address -> packet count).
 	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 	for range ticker.C {
-		var value uint64
-		key := uint32(0)
-		if err := objs.KprobeMap.Lookup(key, &value); err != nil {
-			log.Fatalf("reading map: %v", err)
+		s, err := formatMapContents(objs.XdpStatsMap)
+		if err != nil {
+			log.Printf("Error reading map: %s", err)
+			continue
 		}
-		fmt.Printf("检测到 mkdir 累计调用次数: %d\n", value)
+		log.Printf("Map contents:\n%s", s)
 	}
+}
+
+func formatMapContents(m *ebpf.Map) (string, error) {
+	var (
+		sb  strings.Builder
+		key netip.Addr
+		val uint32
+	)
+	iter := m.Iterate()
+	for iter.Next(&key, &val) {
+		sourceIP := key // IPv4 source address in network byte order.
+		packetCount := val
+		sb.WriteString(fmt.Sprintf("\t%s => %d\n", sourceIP, packetCount))
+	}
+	return sb.String(), iter.Err()
 }
