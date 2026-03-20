@@ -34,3 +34,6 @@ logout:
 bpf_check: dataplane
 	sudo rm /sys/fs/bpf/test
 	sudo /usr/lib/linux-tools/6.8.0-106-generic/bpftool prog load pkg/dataplane/bpf/bpf_bpfel.o /sys/fs/bpf/test
+
+disable_xdp:
+	sudo ip link set dev eth0 xdp off
