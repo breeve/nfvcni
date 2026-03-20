@@ -25,3 +25,7 @@ dataplane_bpf: gateway_dataplane_vmlinux_h
 .PHONY: dataplane
 dataplane: dataplane_bpf
 	go build -o bin/dataplane pkg/dataplane/main.go
+
+.PHONY: logout
+logout:
+	sudo /usr/lib/linux-tools/6.8.0-106-generic/bpftool prog tracelog
