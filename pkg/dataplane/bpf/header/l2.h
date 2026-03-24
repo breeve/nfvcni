@@ -99,7 +99,7 @@ static __always_inline int l2_recv_vlan(struct xdp_md *ctx,
       }
       // access 可以接受普通报文
       *vlan_id = in_if_config->l2.vlan_id;
-      return XDP_PASS;
+      return 0;
     } else {
       // access 需要拒绝和自己vlan_id不一致的vlan报文
       __u32 vlan_tci = bpf_ntohs(vlan_header->h_vlan_TCI) & 0x0FFF;
@@ -108,7 +108,7 @@ static __always_inline int l2_recv_vlan(struct xdp_md *ctx,
       }
 
       *vlan_id = vlan_tci;
-      return XDP_PASS;
+      return 0;
     }
   } else {
     // trunk
@@ -119,25 +119,25 @@ static __always_inline int l2_recv_vlan(struct xdp_md *ctx,
         return XDP_DROP;
       }
       *vlan_id = in_if_config->l2.vlan_id;
-      return XDP_PASS;
+      return 0;
     } else {
       __u32 vlan_tci = bpf_ntohs(vlan_header->h_vlan_TCI) & 0x0FFF;
       if (vlan_tci == in_if_config->l2.vlan_id) {
         // trunk 可以接受一个vlanid等于nativeid的报文，哪怕这个nativeid不在trunk
         // range内
         *vlan_id = vlan_tci;
-        return XDP_PASS;
+        return 0;
       }
 
       // 不在 trunk range, drop
       if (vlan_tci < in_if_config->l2.vlan_range_start ||
           vlan_tci > in_if_config->l2.vlan_range_end) {
-        return XDP_DROP;
+        return -1;
       }
 
       // 在 trunk range, pass
       *vlan_id = vlan_tci;
-      return XDP_PASS;
+      return 0;
     }
   }
 }
@@ -170,13 +170,13 @@ static __always_inline int l2_out(struct xdp_md *ctx,
     if (out_config->l2.vlan_mode == VLAN_ACCESS) {
       // 1. Decap VLAN: 移除 4 字节的 VLAN Tag
       if (bpf_xdp_adjust_head(ctx, (int)sizeof(struct vlan_hdr)))
-        return XDP_ABORTED;
+        return XDP_DROP;
 
       // 重新获取指针并恢复 MAC 地址（此时协议类型需要修正为原始协议）
       void *data = (void *)(long)ctx->data;
       void *data_end = (void *)(long)ctx->data_end;
       if (data + sizeof(struct ethhdr) > data_end) {
-        return XDP_ABORTED;
+        return XDP_DROP;
       }
 
       struct ethhdr *new_eth = data;
@@ -194,13 +194,13 @@ static __always_inline int l2_out(struct xdp_md *ctx,
       // 4. Encap VLAN: 插入 4 字节 VLAN Tag
       // 将 head 向前移动 4 字节
       if (bpf_xdp_adjust_head(ctx, -(int)sizeof(struct vlan_hdr)))
-        return XDP_ABORTED;
+        return XDP_DROP;
 
       void *data = (void *)(long)ctx->data;
       void *data_end = (void *)(long)ctx->data_end;
       // 必须重新做边界检查
       if (data + sizeof(struct ethhdr) + sizeof(struct vlan_hdr) > data_end) {
-        return XDP_ABORTED;
+        return XDP_DROP;
       }
 
       struct ethhdr *new_eth = data;

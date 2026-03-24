@@ -35,10 +35,6 @@ struct {
   __type(value, struct bpf_config);
 } config_map SEC(".maps");
 
-#define CHECK_BOUNDS(ptr, data_end)                                            \
-  if ((void *)(ptr) + sizeof(*(ptr)) > (data_end))                             \
-    return XDP_DROP;
-
 SEC("xdp")
 int xdp_process(struct xdp_md *ctx) {
   __u32 key = 0;
@@ -52,7 +48,7 @@ int xdp_process(struct xdp_md *ctx) {
   struct iface_config_item *in_if_config =
       bpf_map_lookup_elem(&iface_config_map, &ingress_ifindex);
   if (in_if_config == NULL) {
-    return XDP_PASS;
+    return XDP_DROP;
   }
 
   bpf_spin_lock(&in_if_config->lock);
@@ -66,7 +62,7 @@ int xdp_process(struct xdp_md *ctx) {
     bpf_tail_call(ctx, &xdp_jmp_table, XDP_ID_L3);
   }
 
-  return XDP_PASS;
+  return XDP_DROP;
 }
 
 SEC("xdp")
@@ -117,7 +113,7 @@ int xdp_l2_process(struct xdp_md *ctx) {
     }
   }
   __u32 vlan_id = 0;
-  if (XDP_DROP ==
+  if (0 !=
       l2_recv_vlan(ctx, in_if_config, ether_header, vlan_header, &vlan_id)) {
     return XDP_DROP;
   }
@@ -188,7 +184,7 @@ int xdp_l3_process(struct xdp_md *ctx) {
     return XDP_DROP;
   }
 
-  enum xdp_action ret = XDP_PASS;
+  enum xdp_action ret = XDP_DROP;
   switch (eth_proto) {
   case ETH_P_ARP:
     // ret = arp_process(ctx, ether_next_data);
@@ -216,12 +212,12 @@ int tc_ingress(struct __sk_buff *skb) {
   void *data_meta = (void *)(long)skb->data_meta;
 
   if (data_meta + sizeof(struct dp_metadata) > data) {
-    return TC_ACT_OK;
+    return TC_ACT_SHOT;
   }
 
   struct dp_metadata *md = data_meta;
   if (DP_META_MAGIC != md->magic) {
-    return TC_ACT_OK;
+    return TC_ACT_SHOT;
   }
 
   if (md->meta_type == DP_META_L2) {
@@ -230,7 +226,7 @@ int tc_ingress(struct __sk_buff *skb) {
     bpf_tail_call(skb, &tc_jmp_table, TC_INGRESS_ID_L3);
   }
 
-  return TC_ACT_OK;
+  return TC_ACT_SHOT;
 }
 
 SEC("tc") int tc_ingress_l2(struct __sk_buff *skb) {
@@ -253,4 +249,4 @@ SEC("tc") int tc_ingress_l2(struct __sk_buff *skb) {
   return TC_ACT_SHOT;
 }
 
-SEC("tc") int tc_ingress_l3(struct __sk_buff *skb) { return TC_ACT_OK; }
+SEC("tc") int tc_ingress_l3(struct __sk_buff *skb) { return TC_ACT_SHOT; }
