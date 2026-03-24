@@ -1,6 +1,7 @@
 // +build ignore
 
 // vmlinux first
+#include "forward_config.h"
 #include "vmlinux.h"
 
 // bpf second
@@ -114,19 +115,18 @@ int xdp_l2_process(struct xdp_md *ctx) {
       return XDP_DROP;
     }
   }
-  __u32 vlan_id_fdb = 0;
-  if (XDP_DROP == l2_recv_vlan(ctx, in_if_config, ether_header, vlan_header,
-                               &vlan_id_fdb)) {
+  __u32 vlan_id = 0;
+  if (XDP_DROP ==
+      l2_recv_vlan(ctx, in_if_config, ether_header, vlan_header, &vlan_id)) {
     return XDP_DROP;
   }
 
-  fdb_learning(ctx, in_if_config, ether_header, vlan_header, vlan_id_fdb);
-  fdb_lookup(ctx, in_if_config, ether_header, vlan_header, vlan_id_fdb);
+  fdb_learning(ctx, ether_header, vlan_header, vlan_id);
+  fdb_lookup(ctx, ether_header, vlan_header, vlan_id);
 
   struct fdb_value *fdb_result = &cache->fdb_value;
   if (fdb_result->ifindex == 0) {
-    // TODO tag meta: NEED FLOOD, pass to TC do flood.
-    return XDP_PASS;
+    return fdb_flood_tag(ctx, ether_header, vlan_header, vlan_id);
   }
 
   __u32 out_if_index = fdb_result->ifindex;
@@ -140,7 +140,7 @@ int xdp_l2_process(struct xdp_md *ctx) {
                    sizeof(struct iface_config));
   bpf_spin_unlock(&out_if_config_item->lock);
 
-  return l2_out(ctx, ether_header, vlan_header, vlan_id_fdb);
+  return l2_out(ctx, ether_header, vlan_header, vlan_id);
 }
 
 SEC("xdp")

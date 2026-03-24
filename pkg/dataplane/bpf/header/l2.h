@@ -14,13 +14,12 @@
 #include "protocol.h"
 
 static __always_inline void fdb_learning(struct xdp_md *ctx,
-                                         struct iface_config *config,
                                          struct ethhdr *ether_header,
                                          struct vlan_hdr *vlan_header,
-                                         __u32 vlan_id_fdb) {
+                                         __u32 vlan_id) {
   struct fdb_key key = {};
   __builtin_memcpy(key.mac, ether_header->h_source, 6);
-  key.vlan_id = (__u16)vlan_id_fdb;
+  key.vlan_id = (__u16)vlan_id;
 
   struct fdb_value_item *existing = bpf_map_lookup_elem(&fdb_table, &key);
   if (!existing) {
@@ -56,10 +55,9 @@ static __always_inline void fdb_learning(struct xdp_md *ctx,
 }
 
 static __always_inline void fdb_lookup(struct xdp_md *ctx,
-                                       struct iface_config *config,
                                        struct ethhdr *ether_header,
                                        struct vlan_hdr *vlan_header,
-                                       __u32 vlan_id_fdb) {
+                                       __u32 vlan_id) {
   __u32 zero = 0;
   struct forward_config *cache =
       bpf_map_lookup_elem(&forward_config_cache, &zero);
@@ -69,7 +67,7 @@ static __always_inline void fdb_lookup(struct xdp_md *ctx,
 
   struct fdb_key key = {};
   __builtin_memcpy(key.mac, ether_header->h_source, 6);
-  key.vlan_id = (__u16)vlan_id_fdb;
+  key.vlan_id = (__u16)vlan_id;
 
   struct fdb_value_item *val;
 
@@ -89,27 +87,27 @@ static __always_inline void fdb_lookup(struct xdp_md *ctx,
 }
 
 static __always_inline int l2_recv_vlan(struct xdp_md *ctx,
-                                        struct iface_config *config,
+                                        struct iface_config *in_if_config,
                                         struct ethhdr *ether_header,
                                         struct vlan_hdr *vlan_header,
-                                        __u32 *vlan_id_fdb) {
-  if (config->l2.vlan_mode == VLAN_ACCESS) {
+                                        __u32 *vlan_id) {
+  if (in_if_config->l2.vlan_mode == VLAN_ACCESS) {
     // access
     if (vlan_header == NULL) {
-      if (0 == config->l2.vlan_id) {
+      if (0 == in_if_config->l2.vlan_id) {
         return XDP_DROP;
       }
       // access 可以接受普通报文
-      *vlan_id_fdb = config->l2.vlan_id;
+      *vlan_id = in_if_config->l2.vlan_id;
       return XDP_PASS;
     } else {
       // access 需要拒绝和自己vlan_id不一致的vlan报文
-      __u32 vlan_id = bpf_ntohs(vlan_header->h_vlan_TCI) & 0x0FFF;
-      if (vlan_id != config->l2.vlan_id) {
+      __u32 vlan_tci = bpf_ntohs(vlan_header->h_vlan_TCI) & 0x0FFF;
+      if (vlan_tci != in_if_config->l2.vlan_id) {
         return XDP_DROP;
       }
 
-      *vlan_id_fdb = vlan_id;
+      *vlan_id = vlan_tci;
       return XDP_PASS;
     }
   } else {
@@ -117,38 +115,36 @@ static __always_inline int l2_recv_vlan(struct xdp_md *ctx,
     if (vlan_header == NULL) {
       // trunk 可以接受普通报文，但是需要配置
       // native_id，使用native_id作为其报文的vlan_tag，在后续的fdb查找逻辑进行处理
-      if (config->l2.vlan_id == 0) {
+      if (in_if_config->l2.vlan_id == 0) {
         return XDP_DROP;
       }
-      *vlan_id_fdb = config->l2.vlan_id;
+      *vlan_id = in_if_config->l2.vlan_id;
       return XDP_PASS;
     } else {
-      __u32 vlan_id = bpf_ntohs(vlan_header->h_vlan_TCI) & 0x0FFF;
-      if (vlan_id == config->l2.vlan_id) {
+      __u32 vlan_tci = bpf_ntohs(vlan_header->h_vlan_TCI) & 0x0FFF;
+      if (vlan_tci == in_if_config->l2.vlan_id) {
         // trunk 可以接受一个vlanid等于nativeid的报文，哪怕这个nativeid不在trunk
         // range内
-        *vlan_id_fdb = vlan_id;
+        *vlan_id = vlan_tci;
         return XDP_PASS;
       }
 
       // 不在 trunk range, drop
-      if (vlan_id < config->l2.vlan_range_start ||
-          vlan_id > config->l2.vlan_range_end) {
+      if (vlan_tci < in_if_config->l2.vlan_range_start ||
+          vlan_tci > in_if_config->l2.vlan_range_end) {
         return XDP_DROP;
       }
 
       // 在 trunk range, pass
-      *vlan_id_fdb = vlan_id;
+      *vlan_id = vlan_tci;
       return XDP_PASS;
     }
   }
 }
 
 static __always_inline int l2_out(struct xdp_md *ctx,
-
                                   struct ethhdr *ether_header,
-                                  struct vlan_hdr *vlan_header,
-                                  __u32 vlan_id_fdb) {
+                                  struct vlan_hdr *vlan_header, __u32 vlan_id) {
   __u32 key = 0;
   struct forward_config *cache =
       bpf_map_lookup_elem(&forward_config_cache, &key);
@@ -216,13 +212,38 @@ static __always_inline int l2_out(struct xdp_md *ctx,
       new_eth->h_proto = bpf_htons(ETH_P_8021Q);
 
       new_vlan->h_vlan_TCI =
-          bpf_htons(vlan_id_fdb & 0x0FFF); // 填入 FDB 查到的 VLAN ID
+          bpf_htons(vlan_id & 0x0FFF); // 填入 FDB 查到的 VLAN ID
       new_vlan->h_vlan_encapsulated_proto = eth_tmp.h_proto; // 记录原始协议
     }
   }
 
   // 最后统一执行重定向
   return bpf_redirect(out_config->ifindex, 0);
+}
+
+static __always_inline int fdb_flood_tag(struct xdp_md *ctx,
+                                         struct ethhdr *ether_header,
+                                         struct vlan_hdr *vlan_header,
+                                         __u32 vlan_id) {
+  int ret = bpf_xdp_adjust_meta(ctx, -(int)sizeof(struct l2_metadata));
+  if (ret < 0) {
+    return XDP_DROP;
+  }
+
+  void *data = (void *)(long)ctx->data;
+  void *data_meta = (void *)(long)ctx->data_meta;
+  void *data_end = (void *)(long)ctx->data_end;
+  if (data_meta + sizeof(struct l2_metadata) > data) {
+    return XDP_DROP;
+  }
+  struct l2_metadata *md = data_meta;
+  __builtin_memset(md, 0, sizeof(struct l2_metadata));
+  if (vlan_header != NULL) {
+    md->flags |= L2_VLAN_PACKET;
+  }
+  md->flags |= L2_FLOOD;
+  md->vlan_id = vlan_id;
+  return XDP_PASS;
 }
 
 #endif

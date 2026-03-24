@@ -100,4 +100,11 @@ struct {
         },
 };
 
+struct l2_metadata {
+#define L2_VLAN_PACKET 0x0001
+#define L2_FLOOD 0x0002
+  __u32 flags;
+  __u32 vlan_id;
+} __attribute__((aligned(8)));
+
 #endif
