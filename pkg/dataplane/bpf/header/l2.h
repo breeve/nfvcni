@@ -60,7 +60,7 @@ static __always_inline void fdb_lookup(struct xdp_md *ctx,
                                        __u32 vlan_id) {
   __u32 zero = 0;
   struct forward_config *cache =
-      bpf_map_lookup_elem(&forward_config_cache, &zero);
+      bpf_map_lookup_elem(&xdp_forward_config_cache, &zero);
   if (cache == NULL) {
     return;
   }
@@ -147,7 +147,7 @@ static __always_inline int l2_out(struct xdp_md *ctx,
                                   struct vlan_hdr *vlan_header, __u32 vlan_id) {
   __u32 key = 0;
   struct forward_config *cache =
-      bpf_map_lookup_elem(&forward_config_cache, &key);
+      bpf_map_lookup_elem(&xdp_forward_config_cache, &key);
   if (cache == NULL || cache->out_if_config.ifindex == 0) {
     return XDP_DROP;
   }
@@ -225,7 +225,7 @@ static __always_inline int fdb_flood_tag(struct xdp_md *ctx,
                                          struct ethhdr *ether_header,
                                          struct vlan_hdr *vlan_header,
                                          __u32 vlan_id) {
-  int ret = bpf_xdp_adjust_meta(ctx, -(int)sizeof(struct l2_metadata));
+  int ret = bpf_xdp_adjust_meta(ctx, -(int)sizeof(struct dp_metadata));
   if (ret < 0) {
     return XDP_DROP;
   }
@@ -233,16 +233,19 @@ static __always_inline int fdb_flood_tag(struct xdp_md *ctx,
   void *data = (void *)(long)ctx->data;
   void *data_meta = (void *)(long)ctx->data_meta;
   void *data_end = (void *)(long)ctx->data_end;
-  if (data_meta + sizeof(struct l2_metadata) > data) {
+  if (data_meta + sizeof(struct dp_metadata) > data) {
     return XDP_DROP;
   }
-  struct l2_metadata *md = data_meta;
+
+  struct dp_metadata *md = data_meta;
   __builtin_memset(md, 0, sizeof(struct l2_metadata));
+  md->magic = DP_META_MAGIC;
+  md->meta_type = DP_META_L2;
   if (vlan_header != NULL) {
-    md->flags |= L2_VLAN_PACKET;
+    md->l2.flags |= L2_VLAN_PACKET;
   }
-  md->flags |= L2_FLOOD;
-  md->vlan_id = vlan_id;
+  md->l2.flags |= L2_FLOOD;
+  md->l2.vlan_id = vlan_id;
   return XDP_PASS;
 }
 

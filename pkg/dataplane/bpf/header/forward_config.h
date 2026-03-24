@@ -75,28 +75,28 @@ struct {
   __uint(max_entries, 1);
   __type(key, __u32);
   __type(value, struct forward_config);
-} forward_config_cache SEC(".maps");
-
-enum {
-  PROG_ID_L2 = 0,
-  PROG_ID_L3 = 1,
-  PROG_ID_MAX,
-};
+} xdp_forward_config_cache SEC(".maps");
 
 SEC("xdp") int xdp_l2_process(struct xdp_md *ctx);
 SEC("xdp") int xdp_l3_process(struct xdp_md *ctx);
 
+enum {
+  XDP_ID_L2 = 0,
+  XDP_ID_L3 = 1,
+  XDP_ID_MAX,
+};
+
 struct {
   __uint(type, BPF_MAP_TYPE_PROG_ARRAY);
-  __uint(max_entries, PROG_ID_MAX);
+  __uint(max_entries, XDP_ID_MAX);
   __uint(key_size, sizeof(__u32));
   __uint(value_size, sizeof(__u32));
   __array(values, int());
-} jmp_table SEC(".maps") = {
+} xdp_jmp_table SEC(".maps") = {
     .values =
         {
-            [PROG_ID_L2] = &xdp_l2_process,
-            [PROG_ID_L3] = &xdp_l3_process,
+            [XDP_ID_L2] = &xdp_l2_process,
+            [XDP_ID_L3] = &xdp_l3_process,
         },
 };
 
@@ -106,5 +106,42 @@ struct l2_metadata {
   __u32 flags;
   __u32 vlan_id;
 } __attribute__((aligned(8)));
+
+struct l3_metadata {
+  __u32 flags;
+} __attribute__((aligned(8)));
+
+struct dp_metadata {
+#define DP_META_MAGIC 0x4E465643
+  __u32 magic;
+#define DP_META_L2 0x0001
+#define DP_META_L3 0x0002
+  __u32 meta_type;
+  struct l2_metadata l2;
+  struct l3_metadata l3;
+} __attribute__((aligned(8)));
+
+SEC("tc") int tc_ingress_l2(struct __sk_buff *skb);
+SEC("tc") int tc_ingress_l3(struct __sk_buff *skb);
+
+enum {
+  TC_INGRESS_ID_L2 = 0,
+  TC_INGRESS_ID_L3 = 1,
+  TC_ID_MAX,
+};
+
+struct {
+  __uint(type, BPF_MAP_TYPE_PROG_ARRAY);
+  __uint(max_entries, TC_ID_MAX);
+  __uint(key_size, sizeof(__u32));
+  __uint(value_size, sizeof(__u32));
+  __array(values, int());
+} tc_jmp_table SEC(".maps") = {
+    .values =
+        {
+            [TC_INGRESS_ID_L2] = &tc_ingress_l2,
+            [TC_INGRESS_ID_L3] = &tc_ingress_l3,
+        },
+};
 
 #endif

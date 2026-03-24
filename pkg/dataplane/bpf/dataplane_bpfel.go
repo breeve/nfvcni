@@ -156,21 +156,25 @@ type dataplaneSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type dataplaneProgramSpecs struct {
+	TcIngress    *ebpf.ProgramSpec `ebpf:"tc_ingress"`
+	TcIngressL2  *ebpf.ProgramSpec `ebpf:"tc_ingress_l2"`
+	TcIngressL3  *ebpf.ProgramSpec `ebpf:"tc_ingress_l3"`
 	XdpL2Process *ebpf.ProgramSpec `ebpf:"xdp_l2_process"`
 	XdpL3Process *ebpf.ProgramSpec `ebpf:"xdp_l3_process"`
-	XdpProgFunc  *ebpf.ProgramSpec `ebpf:"xdp_prog_func"`
+	XdpProcess   *ebpf.ProgramSpec `ebpf:"xdp_process"`
 }
 
 // dataplaneMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type dataplaneMapSpecs struct {
-	ConfigMap          *ebpf.MapSpec `ebpf:"config_map"`
-	FdbTable           *ebpf.MapSpec `ebpf:"fdb_table"`
-	ForwardConfigCache *ebpf.MapSpec `ebpf:"forward_config_cache"`
-	IfaceConfigMap     *ebpf.MapSpec `ebpf:"iface_config_map"`
-	JmpTable           *ebpf.MapSpec `ebpf:"jmp_table"`
-	XdpStatsMap        *ebpf.MapSpec `ebpf:"xdp_stats_map"`
+	ConfigMap             *ebpf.MapSpec `ebpf:"config_map"`
+	FdbTable              *ebpf.MapSpec `ebpf:"fdb_table"`
+	IfaceConfigMap        *ebpf.MapSpec `ebpf:"iface_config_map"`
+	TcJmpTable            *ebpf.MapSpec `ebpf:"tc_jmp_table"`
+	XdpForwardConfigCache *ebpf.MapSpec `ebpf:"xdp_forward_config_cache"`
+	XdpJmpTable           *ebpf.MapSpec `ebpf:"xdp_jmp_table"`
+	XdpStatsMap           *ebpf.MapSpec `ebpf:"xdp_stats_map"`
 }
 
 // dataplaneVariableSpecs contains global variables before they are loaded into the kernel.
@@ -199,21 +203,23 @@ func (o *dataplaneObjects) Close() error {
 //
 // It can be passed to loadDataplaneObjects or ebpf.CollectionSpec.LoadAndAssign.
 type dataplaneMaps struct {
-	ConfigMap          *ebpf.Map `ebpf:"config_map"`
-	FdbTable           *ebpf.Map `ebpf:"fdb_table"`
-	ForwardConfigCache *ebpf.Map `ebpf:"forward_config_cache"`
-	IfaceConfigMap     *ebpf.Map `ebpf:"iface_config_map"`
-	JmpTable           *ebpf.Map `ebpf:"jmp_table"`
-	XdpStatsMap        *ebpf.Map `ebpf:"xdp_stats_map"`
+	ConfigMap             *ebpf.Map `ebpf:"config_map"`
+	FdbTable              *ebpf.Map `ebpf:"fdb_table"`
+	IfaceConfigMap        *ebpf.Map `ebpf:"iface_config_map"`
+	TcJmpTable            *ebpf.Map `ebpf:"tc_jmp_table"`
+	XdpForwardConfigCache *ebpf.Map `ebpf:"xdp_forward_config_cache"`
+	XdpJmpTable           *ebpf.Map `ebpf:"xdp_jmp_table"`
+	XdpStatsMap           *ebpf.Map `ebpf:"xdp_stats_map"`
 }
 
 func (m *dataplaneMaps) Close() error {
 	return _DataplaneClose(
 		m.ConfigMap,
 		m.FdbTable,
-		m.ForwardConfigCache,
 		m.IfaceConfigMap,
-		m.JmpTable,
+		m.TcJmpTable,
+		m.XdpForwardConfigCache,
+		m.XdpJmpTable,
 		m.XdpStatsMap,
 	)
 }
@@ -228,16 +234,22 @@ type dataplaneVariables struct {
 //
 // It can be passed to loadDataplaneObjects or ebpf.CollectionSpec.LoadAndAssign.
 type dataplanePrograms struct {
+	TcIngress    *ebpf.Program `ebpf:"tc_ingress"`
+	TcIngressL2  *ebpf.Program `ebpf:"tc_ingress_l2"`
+	TcIngressL3  *ebpf.Program `ebpf:"tc_ingress_l3"`
 	XdpL2Process *ebpf.Program `ebpf:"xdp_l2_process"`
 	XdpL3Process *ebpf.Program `ebpf:"xdp_l3_process"`
-	XdpProgFunc  *ebpf.Program `ebpf:"xdp_prog_func"`
+	XdpProcess   *ebpf.Program `ebpf:"xdp_process"`
 }
 
 func (p *dataplanePrograms) Close() error {
 	return _DataplaneClose(
+		p.TcIngress,
+		p.TcIngressL2,
+		p.TcIngressL3,
 		p.XdpL2Process,
 		p.XdpL3Process,
-		p.XdpProgFunc,
+		p.XdpProcess,
 	)
 }
 

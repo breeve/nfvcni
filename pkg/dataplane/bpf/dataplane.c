@@ -2,6 +2,7 @@
 
 // vmlinux first
 #include "forward_config.h"
+#include "linux_header.h"
 #include "vmlinux.h"
 
 // bpf second
@@ -39,10 +40,10 @@ struct {
     return XDP_DROP;
 
 SEC("xdp")
-int xdp_prog_func(struct xdp_md *ctx) {
+int xdp_process(struct xdp_md *ctx) {
   __u32 key = 0;
   struct forward_config *cache =
-      bpf_map_lookup_elem(&forward_config_cache, &key);
+      bpf_map_lookup_elem(&xdp_forward_config_cache, &key);
   if (cache == NULL) {
     return XDP_DROP;
   }
@@ -60,9 +61,9 @@ int xdp_prog_func(struct xdp_md *ctx) {
   bpf_spin_unlock(&in_if_config->lock);
 
   if (cache->in_if_config.mode == IF_MODE_L2) {
-    bpf_tail_call(ctx, &jmp_table, PROG_ID_L2);
+    bpf_tail_call(ctx, &xdp_jmp_table, XDP_ID_L2);
   } else if (cache->in_if_config.mode == IF_MODE_L3) {
-    bpf_tail_call(ctx, &jmp_table, PROG_ID_L3);
+    bpf_tail_call(ctx, &xdp_jmp_table, XDP_ID_L3);
   }
 
   return XDP_PASS;
@@ -77,7 +78,7 @@ int xdp_l2_process(struct xdp_md *ctx) {
 
   __u32 key = 0;
   struct forward_config *cache =
-      bpf_map_lookup_elem(&forward_config_cache, &key);
+      bpf_map_lookup_elem(&xdp_forward_config_cache, &key);
   if (cache == NULL || cache->in_if_config.ifindex == 0) {
     return XDP_DROP;
   }
@@ -151,7 +152,7 @@ int xdp_l3_process(struct xdp_md *ctx) {
 
   __u32 key = 0;
   struct forward_config *cache =
-      bpf_map_lookup_elem(&forward_config_cache, &key);
+      bpf_map_lookup_elem(&xdp_forward_config_cache, &key);
   if (cache == NULL || cache->in_if_config.ifindex == 0) {
     return XDP_DROP;
   }
@@ -208,3 +209,30 @@ int xdp_l3_process(struct xdp_md *ctx) {
 
   return ret;
 }
+
+SEC("tc")
+int tc_ingress(struct __sk_buff *skb) {
+  void *data = (void *)(long)skb->data;
+  void *data_meta = (void *)(long)skb->data_meta;
+
+  if (data_meta + sizeof(struct dp_metadata) > data) {
+    return TC_ACT_OK;
+  }
+
+  struct dp_metadata *md = data_meta;
+  if (DP_META_MAGIC != md->magic) {
+    return TC_ACT_OK;
+  }
+
+  if (md->meta_type == DP_META_L2) {
+    bpf_tail_call(skb, &tc_jmp_table, TC_INGRESS_ID_L2);
+  } else if (md->meta_type == DP_META_L3) {
+    bpf_tail_call(skb, &tc_jmp_table, TC_INGRESS_ID_L3);
+  }
+
+  return TC_ACT_OK;
+}
+
+SEC("tc") int tc_ingress_l2(struct __sk_buff *skb) { return TC_ACT_OK; }
+
+SEC("tc") int tc_ingress_l3(struct __sk_buff *skb) { return TC_ACT_OK; }

@@ -34,9 +34,9 @@ func Agent() {
 	}); err != nil {
 		log.Fatalf("loading dataplane objects: %s", err.Error())
 	}
+
 	defer objs.Close()
 
-	// Update map
 	var config dataplaneBpfConfig
 	copy(config.NodeMac[:], iface.HardwareAddr)
 	addrs, _ := iface.Addrs()
@@ -55,11 +55,21 @@ func Agent() {
 
 	// Attach the program.
 	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   objs.XdpProgFunc,
+		Program:   objs.XdpProcess,
 		Interface: iface.Index,
 	})
 	if err != nil {
 		log.Fatalf("could not attach XDP program: %s", err)
+	}
+	defer l.Close()
+
+	l, err = link.AttachTCX(link.TCXOptions{
+		Program:   objs.TcIngress,
+		Attach:    ebpf.AttachTCXIngress,
+		Interface: iface.Index,
+	})
+	if err != nil {
+		log.Fatalf("could not attach TC program: %s", err)
 	}
 	defer l.Close()
 
