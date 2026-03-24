@@ -233,6 +233,24 @@ int tc_ingress(struct __sk_buff *skb) {
   return TC_ACT_OK;
 }
 
-SEC("tc") int tc_ingress_l2(struct __sk_buff *skb) { return TC_ACT_OK; }
+SEC("tc") int tc_ingress_l2(struct __sk_buff *skb) {
+  void *data = (void *)(long)skb->data;
+  void *data_meta = (void *)(long)skb->data_meta;
+  if (data_meta + sizeof(struct dp_metadata) > data) {
+    return TC_ACT_SHOT;
+  }
+
+  struct dp_metadata *md = data_meta;
+  if (md->magic != DP_META_MAGIC) {
+    return TC_ACT_SHOT;
+  }
+
+  if (!(md->l2.flags & L2_FLOOD)) {
+    return TC_ACT_SHOT;
+  }
+
+  // todo
+  return TC_ACT_SHOT;
+}
 
 SEC("tc") int tc_ingress_l3(struct __sk_buff *skb) { return TC_ACT_OK; }
