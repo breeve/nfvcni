@@ -249,4 +249,10 @@ static __always_inline int fdb_flood_tag(struct xdp_md *ctx,
   return XDP_PASS;
 }
 
+static __always_inline int fdb_flood(struct __sk_buff *skb,
+                                     struct dp_metadata *md) {
+  // todo
+  return TC_ACT_SHOT;
+}
+
 #endif

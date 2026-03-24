@@ -241,11 +241,10 @@ SEC("tc") int tc_ingress_l2(struct __sk_buff *skb) {
     return TC_ACT_SHOT;
   }
 
-  if (!(md->l2.flags & L2_FLOOD)) {
-    return TC_ACT_SHOT;
+  if (md->l2.flags & L2_FLOOD) {
+    return fdb_flood(skb, md);
   }
 
-  // todo
   return TC_ACT_SHOT;
 }
 
