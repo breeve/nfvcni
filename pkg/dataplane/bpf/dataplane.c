@@ -89,6 +89,8 @@ int xdp_l2_process(struct xdp_md *ctx) {
   }
 
   // 2. vlan
+  // vlan_tci: parse from pkt.
+  // vlan_id: VLAN Scope ID.
   __u16 eth_proto = bpf_ntohs(ether_header->h_proto);
   if (eth_proto == ETH_P_8021Q || eth_proto == ETH_P_8021AD) {
     if (!ethernet_vlan_hdr(ctx, ether_header, &vlan_header)) {
@@ -101,19 +103,19 @@ int xdp_l2_process(struct xdp_md *ctx) {
       return XDP_DROP;
     }
 
-    __u32 vlan_id = bpf_ntohs(vlan_header->h_vlan_TCI) & 0x0FFF;
-    if (vlan_id == 0) {
+    __u32 vlan_tci = bpf_ntohs(vlan_header->h_vlan_TCI) & 0x0FFF;
+    if (vlan_tci == 0) {
       bpf_printk("Debug: Single VLAN detected, but ID is zero\n");
       return XDP_DROP;
     }
-    bpf_printk("Debug: Single VLAN detected, ID: %d\n", vlan_id);
+    bpf_printk("Debug: Single VLAN detected, ID: %d\n", vlan_tci);
 
     if (!header_next(ctx, vlan_header + 1, &ether_next_data)) {
       return XDP_DROP;
     }
   }
   __u32 vlan_id = 0;
-  if (0 !=
+  if (XDP_PASS !=
       l2_recv_vlan(ctx, in_if_config, ether_header, vlan_header, &vlan_id)) {
     return XDP_DROP;
   }
@@ -137,7 +139,7 @@ int xdp_l2_process(struct xdp_md *ctx) {
                    sizeof(struct iface_config));
   bpf_spin_unlock(&out_if_config_item->lock);
 
-  return l2_out(ctx, ether_header, vlan_header, vlan_id);
+  return xdp_l2_out(ctx, ether_header, vlan_header, vlan_id);
 }
 
 SEC("xdp")
@@ -212,12 +214,14 @@ int tc_ingress(struct __sk_buff *skb) {
   void *data_meta = (void *)(long)skb->data_meta;
 
   if (data_meta + sizeof(struct dp_metadata) > data) {
-    return TC_ACT_SHOT;
+    // pass to kernel
+    return TC_ACT_OK;
   }
 
   struct dp_metadata *md = data_meta;
   if (DP_META_MAGIC != md->magic) {
-    return TC_ACT_SHOT;
+    // pass to kernel
+    return TC_ACT_OK;
   }
 
   if (md->meta_type == DP_META_L2) {
@@ -226,7 +230,8 @@ int tc_ingress(struct __sk_buff *skb) {
     bpf_tail_call(skb, &tc_jmp_table, TC_INGRESS_ID_L3);
   }
 
-  return TC_ACT_SHOT;
+  // pass to kernel
+  return TC_ACT_OK;
 }
 
 SEC("tc") int tc_ingress_l2(struct __sk_buff *skb) {

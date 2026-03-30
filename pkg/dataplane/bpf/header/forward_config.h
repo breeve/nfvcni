@@ -19,12 +19,11 @@ struct iface_config_l2 {
 } __attribute__((aligned(8)));
 
 struct iface_config {
-  struct bpf_spin_lock lock;
   __u32 ifindex;
   __u8 name[64];
   __u8 node_mac[6];
-#define IF_MODE_L2 0x00
-#define IF_MODE_L3 0x01
+#define IF_MODE_L2 0x01
+#define IF_MODE_L3 0x02
   __u16 mode;
 
   struct iface_config_l2 l2 __attribute__((aligned(8)));

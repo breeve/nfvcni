@@ -44,15 +44,12 @@ type dataplaneFdbValueItem struct {
 type dataplaneForwardConfig struct {
 	_          structs.HostLayout
 	InIfConfig struct {
-		_    structs.HostLayout
-		Lock struct {
-			_   structs.HostLayout
-			Val uint32
-		}
+		_       structs.HostLayout
 		Ifindex uint32
 		Name    [64]uint8
 		NodeMac [6]uint8
 		Mode    uint16
+		_       [4]byte
 		L2      struct {
 			_              structs.HostLayout
 			VlanId         uint32
@@ -62,15 +59,12 @@ type dataplaneForwardConfig struct {
 		}
 	}
 	OutIfConfig struct {
-		_    structs.HostLayout
-		Lock struct {
-			_   structs.HostLayout
-			Val uint32
-		}
+		_       structs.HostLayout
 		Ifindex uint32
 		Name    [64]uint8
 		NodeMac [6]uint8
 		Mode    uint16
+		_       [4]byte
 		L2      struct {
 			_              structs.HostLayout
 			VlanId         uint32
@@ -95,15 +89,12 @@ type dataplaneIfaceConfigItem struct {
 	}
 	_      [4]byte
 	Config struct {
-		_    structs.HostLayout
-		Lock struct {
-			_   structs.HostLayout
-			Val uint32
-		}
+		_       structs.HostLayout
 		Ifindex uint32
 		Name    [64]uint8
 		NodeMac [6]uint8
 		Mode    uint16
+		_       [4]byte
 		L2      struct {
 			_              structs.HostLayout
 			VlanId         uint32
