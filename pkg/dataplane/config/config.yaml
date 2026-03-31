@@ -1,0 +1,16 @@
+ports:
+  - name: "dummy0"
+    mode: "l2"
+    l2:
+      vlanMode: "access"
+      vlanId: 0
+  - name: "dummy1"
+    mode: "l2"
+    l2:
+      vlanMode: "access"
+      vlanId: 0
+  - name: "dummy2"
+    mode: "l2"
+    l2:
+      vlanMode: "access"
+      vlanId: 0

@@ -309,20 +309,27 @@ static __always_inline int l2_out(struct iface_config *out_if_config,
                                   int (*l2_send_directly)(void *send_ctx),
                                   void *send_ctx) {
   if (out_if_config->mode != IF_MODE_L2) {
+    bpf_printk("Error: Output iface is not in L2 mode, ifindex: %d\n",
+               out_if_config->ifindex);
     return -1;
   }
 
   if (out_if_config->ifindex == in_if_config->ifindex) {
+    bpf_printk("Error: Input and output interfaces are the same, ifindex: %d\n",
+               out_if_config->ifindex);
     return -1;
   }
   __u32 out_if_vlan_id = out_if_config->l2.vlan_id;
 
   if (out_if_config->l2.vlan_mode == VLAN_ACCESS) {
     if (vlan_id != out_if_vlan_id) {
+      bpf_printk("Error: VLAN ID mismatch, expected: %d, actual: %d\n",
+                 out_if_vlan_id, vlan_id);
       return -1;
     }
     if (is_vlan_pkt) {
       if (vlan_id == 0) {
+        bpf_printk("Error: VLAN ID is zero\n");
         return -1;
       }
       return l2_decap_vlan_and_send(send_ctx);
@@ -331,12 +338,14 @@ static __always_inline int l2_out(struct iface_config *out_if_config,
     }
   } else {
     if (out_if_vlan_id == 0) {
+      bpf_printk("Error: Outgoing interface VLAN ID is zero\n");
       return -1;
     }
 
     if (vlan_id == out_if_vlan_id) {
       if (is_vlan_pkt) {
         if (vlan_id == 0) {
+          bpf_printk("Error: VLAN ID is zero\n");
           return -1;
         }
         return l2_decap_vlan_and_send(send_ctx);
@@ -349,6 +358,7 @@ static __always_inline int l2_out(struct iface_config *out_if_config,
         vlan_id <= out_if_config->l2.vlan_range_end) {
       if (is_vlan_pkt) {
         if (vlan_id == 0) {
+          bpf_printk("Error: VLAN ID is zero\n");
           return -1;
         }
         return l2_send_directly(send_ctx);
@@ -357,9 +367,15 @@ static __always_inline int l2_out(struct iface_config *out_if_config,
       }
     }
 
+    bpf_printk("Error: VLAN ID %d is out of range for output interface, range: "
+               "[%d, %d]\n",
+               vlan_id, out_if_config->l2.vlan_range_start,
+               out_if_config->l2.vlan_range_end);
     return -1;
   }
 
+  bpf_printk("Error: Unhandled case in l2_out, vlan_id: %d, is_vlan_pkt: %d\n",
+             vlan_id, is_vlan_pkt);
   return -1;
 }
 
@@ -371,6 +387,7 @@ static __always_inline int xdp_l2_out(struct xdp_md *ctx,
   struct forward_config *cache =
       bpf_map_lookup_elem(&xdp_forward_config_cache, &key);
   if (cache == NULL || cache->out_if_config.ifindex == 0) {
+    bpf_printk("Error: Forward config cache miss or invalid\n");
     return XDP_DROP;
   }
 
@@ -394,9 +411,15 @@ static __always_inline int xdp_l2_out(struct xdp_md *ctx,
                    xdp_l2_decap_vlan_and_send, xdp_l2_encap_vlan_and_send,
                    xdp_l2_send_directly, &send_ctx);
   if (ret != 0) {
+    bpf_printk(
+        "Error: l2_out failed, out_ifindex: %d, in_ifindex: %d, vlan_id: %d\n",
+        out_config->ifindex, in_config->ifindex, vlan_id);
     return XDP_DROP;
   }
 
+  bpf_printk(
+      "Debug: l2_out success, out_ifindex: %d, in_ifindex: %d, vlan_id: %d\n",
+      out_config->ifindex, in_config->ifindex, vlan_id);
   // send success, so DROP current ctx.
   return XDP_DROP;
 }

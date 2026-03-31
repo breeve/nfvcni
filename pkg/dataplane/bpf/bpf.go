@@ -1,30 +1,20 @@
-package dataplane
+package bpf
 
 import (
-	"encoding/binary"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
-	"net/netip"
 	"os"
 	"strings"
+	"structs"
 	"time"
 
+	"github.com/breeve/nfvcni/pkg/dataplane/config"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 )
 
-func Agent() {
-	if len(os.Args) < 2 {
-		log.Fatalf("Please specify a network interface")
-	}
-
-	ifaceName := os.Args[1]
-	iface, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		log.Fatalf("lookup network iface %q: %s", ifaceName, err)
-	}
-
+func Agent(cfg *config.Config) {
 	objs := dataplaneObjects{}
 	if err := loadDataplaneObjects(&objs, &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
@@ -32,74 +22,157 @@ func Agent() {
 			LogSizeStart: 512 * 1024,
 		},
 	}); err != nil {
-		log.Fatalf("loading dataplane objects: %s", err.Error())
+		slog.Error("loading dataplane objects", "error", err)
 	}
-
 	defer objs.Close()
 
-	var config dataplaneBpfConfig
-	copy(config.NodeMac[:], iface.HardwareAddr)
-	addrs, _ := iface.Addrs()
-	var nodeIP uint32
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
-			nodeIP = binary.BigEndian.Uint32(ipnet.IP.To4())
+	links := []link.Link{}
+	for _, port := range cfg.Ports {
+		slog.Info("Port information", "name", port.Name, "mode", port.Mode)
+
+		iface, err := net.InterfaceByName(port.Name)
+		if err != nil {
+			slog.Error("Error finding interface", "interface", port.Name, "error", err)
+			os.Exit(1)
+		}
+		item := &dataplaneIfaceConfigItem{
+			Config: struct {
+				_       structs.HostLayout
+				Ifindex uint32
+				Name    [64]uint8
+				NodeMac [6]uint8
+				Mode    uint16
+				_       [4]byte
+				L2      struct {
+					_              structs.HostLayout
+					VlanId         uint32
+					VlanMode       uint32
+					VlanRangeStart uint32
+					VlanRangeEnd   uint32
+				}
+			}{
+				Ifindex: uint32(iface.Index),
+				Name:    [64]uint8{},
+				NodeMac: [6]uint8{},
+				Mode:    uint16(0),
+				L2: struct {
+					_              structs.HostLayout
+					VlanId         uint32
+					VlanMode       uint32
+					VlanRangeStart uint32
+					VlanRangeEnd   uint32
+				}{
+					VlanId:         uint32(port.L2.VlanID),
+					VlanMode:       uint32(0), // TODO: support different vlan modes
+					VlanRangeStart: uint32(0),
+					VlanRangeEnd:   uint32(0),
+				},
+			},
+		}
+
+		// populate Name (NUL-terminated if space permits)
+		nameBytes := []byte(port.Name)
+		if len(nameBytes) >= len(item.Config.Name) {
+			copy(item.Config.Name[:], nameBytes[:len(item.Config.Name)-1])
+			item.Config.Name[len(item.Config.Name)-1] = 0
+		} else {
+			copy(item.Config.Name[:], nameBytes)
+			// optional NUL terminator
+			if len(nameBytes) < len(item.Config.Name) {
+				item.Config.Name[len(nameBytes)] = 0
+			}
+		}
+
+		// populate NodeMac (use first 6 bytes of HW address)
+		hw := iface.HardwareAddr
+		if len(hw) >= len(item.Config.NodeMac) {
+			copy(item.Config.NodeMac[:], hw[:len(item.Config.NodeMac)])
+		} else {
+			// if MAC shorter (unlikely), copy what we have
+			copy(item.Config.NodeMac[:], hw)
+		}
+
+		// set Mode based on port.Mode string (adjust mapping as needed)
+		switch port.Mode {
+		case config.InterfaceModeLayer2:
+			item.Config.Mode = 0x01
+		case config.InterfaceModeLayer3:
+			item.Config.Mode = 0x02
+		default:
+			slog.Error("Unsupported interface mode", "interface", port.Name, "mode", port.Mode)
+		}
+		if item.Config.Mode == 0 {
+			slog.Error("Invalid interface mode, skipping interface", "interface", port.Name, "mode", port.Mode)
 			break
 		}
+
+		// update map
+		if err := objs.IfaceConfigMap.Update(uint32(iface.Index), item, ebpf.UpdateAny); err != nil {
+			slog.Error("failed to pre-configure map", "interface", port.Name, "error", err)
+			os.Exit(1)
+		}
+
+		// attach XDP program to the interface
+		lXdp, err := link.AttachXDP(link.XDPOptions{
+			Program:   objs.XdpProcess,
+			Interface: iface.Index,
+		})
+		if err != nil {
+			slog.Error("could not attach XDP program", "error", err)
+			break
+		}
+		links = append(links, lXdp)
+
+		// attach TC program to the interface
+		lXtc, err := link.AttachTCX(link.TCXOptions{
+			Program:   objs.TcIngress,
+			Attach:    ebpf.AttachTCXIngress,
+			Interface: iface.Index,
+		})
+		if err != nil {
+			slog.Error("could not attach TC program", "error", err)
+		}
+		links = append(links, lXtc)
 	}
-	config.NodeIp = nodeIP
-
-	if err := objs.ConfigMap.Update(uint32(0), &config, ebpf.UpdateAny); err != nil {
-		log.Fatalf("failed to pre-configure map: %v", err)
+	if len(links) == 0 {
+		slog.Error("Failed to attach BPF program to any interface, exiting")
+		os.Exit(1)
 	}
-
-	// Attach the program.
-	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   objs.XdpProcess,
-		Interface: iface.Index,
-	})
-	if err != nil {
-		log.Fatalf("could not attach XDP program: %s", err)
+	if len(links) != len(cfg.Ports)*2 {
+		for _, l := range links {
+			l.Close()
+		}
+		slog.Error("Failed to attach XDP program to all interfaces, exiting", "attached", len(links), "expected", len(cfg.Ports)*2)
+		os.Exit(1)
 	}
-	defer l.Close()
+	defer func() {
+		for _, l := range links {
+			l.Close()
+		}
+	}()
 
-	l, err = link.AttachTCX(link.TCXOptions{
-		Program:   objs.TcIngress,
-		Attach:    ebpf.AttachTCXIngress,
-		Interface: iface.Index,
-	})
-	if err != nil {
-		log.Fatalf("could not attach TC program: %s", err)
-	}
-	defer l.Close()
-
-	log.Printf("Attached XDP program to iface %q (index %d)", iface.Name, iface.Index)
-	log.Printf("Press Ctrl-C to exit and remove the program")
-
-	// Print the contents of the BPF hash map (source IP address -> packet count).
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		s, err := formatMapContents(objs.XdpStatsMap)
+		s, err := formatFdbTables(objs.FdbTable)
 		if err != nil {
-			log.Printf("Error reading map: %s", err)
+			slog.Error("Error reading fdb map", "error", err)
 			continue
 		}
-		log.Printf("Map contents:\n%s", s)
+		slog.Info("FDB table", "data", s)
 	}
 }
 
-func formatMapContents(m *ebpf.Map) (string, error) {
-	var (
-		sb  strings.Builder
-		key netip.Addr
-		val uint32
-	)
+func formatFdbTables(m *ebpf.Map) (string, error) {
+	var sb strings.Builder
+	var key dataplaneFdbKey
+	var val dataplaneFdbValueItem
+
 	iter := m.Iterate()
 	for iter.Next(&key, &val) {
-		sourceIP := key // IPv4 source address in network byte order.
-		packetCount := val
-		sb.WriteString(fmt.Sprintf("\t%s => %d\n", sourceIP, packetCount))
+		msg := fmt.Sprintf("\t%s, %d => %d, %d\n", key.Mac, key.VlanId, val.Value.Ifindex, val.Value.LastSeen)
+		sb.WriteString(msg)
 	}
+
 	return sb.String(), iter.Err()
 }

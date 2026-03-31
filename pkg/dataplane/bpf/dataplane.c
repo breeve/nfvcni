@@ -13,34 +13,15 @@
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
-#define MAX_MAP_ENTRIES 16
-
-/* Define an LRU hash map for storing packet count by source IPv4 address */
-struct {
-  __uint(type, BPF_MAP_TYPE_LRU_HASH);
-  __uint(max_entries, MAX_MAP_ENTRIES);
-  __type(key, __u32);   // source IPv4 address
-  __type(value, __u32); // packet count
-} xdp_stats_map SEC(".maps");
-
-struct bpf_config {
-  __u8 node_mac[6];
-  __u32 node_ip; // BigEndian
-};
-
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __uint(max_entries, 1);
-  __type(key, __u32);
-  __type(value, struct bpf_config);
-} config_map SEC(".maps");
-
 SEC("xdp")
 int xdp_process(struct xdp_md *ctx) {
+  bpf_printk("Debug: xdp_process called, ingress_ifindex: %d\n",
+             ctx->ingress_ifindex);
   __u32 key = 0;
   struct forward_config *cache =
       bpf_map_lookup_elem(&xdp_forward_config_cache, &key);
   if (cache == NULL) {
+    bpf_printk("Error: Forward config cache lookup failed\n");
     return XDP_DROP;
   }
 
@@ -48,6 +29,8 @@ int xdp_process(struct xdp_md *ctx) {
   struct iface_config_item *in_if_config =
       bpf_map_lookup_elem(&iface_config_map, &ingress_ifindex);
   if (in_if_config == NULL) {
+    bpf_printk("Error: Incoming interface config not found for ifindex %d\n",
+               ingress_ifindex);
     return XDP_DROP;
   }
 
@@ -62,6 +45,9 @@ int xdp_process(struct xdp_md *ctx) {
     bpf_tail_call(ctx, &xdp_jmp_table, XDP_ID_L3);
   }
 
+  bpf_printk("Error: Invalid mode %d for ifindex %d\n",
+             cache->in_if_config.mode, cache->in_if_config.ifindex);
+
   return XDP_DROP;
 }
 
@@ -72,19 +58,25 @@ int xdp_l2_process(struct xdp_md *ctx) {
   struct vlan_hdr *vlan_header = NULL;
   void *ether_next_data = NULL;
 
+  bpf_printk("Debug: xdp_l2_process called, ingress_ifindex: %d\n",
+             ctx->ingress_ifindex);
+
   __u32 key = 0;
   struct forward_config *cache =
       bpf_map_lookup_elem(&xdp_forward_config_cache, &key);
   if (cache == NULL || cache->in_if_config.ifindex == 0) {
+    bpf_printk("Error: Forward config cache miss or invalid\n");
     return XDP_DROP;
   }
   in_if_config = &cache->in_if_config;
 
   // 1. ethernet
   if (!ethernet_ethhdr(ctx, &ether_header)) {
+    bpf_printk("Error: Failed to parse Ethernet header\n");
     return XDP_DROP;
   }
   if (!header_next(ctx, ether_header + 1, &ether_next_data)) {
+    bpf_printk("Error: Packet too short for Ethernet header\n");
     return XDP_DROP;
   }
 
@@ -94,6 +86,7 @@ int xdp_l2_process(struct xdp_md *ctx) {
   __u16 eth_proto = bpf_ntohs(ether_header->h_proto);
   if (eth_proto == ETH_P_8021Q || eth_proto == ETH_P_8021AD) {
     if (!ethernet_vlan_hdr(ctx, ether_header, &vlan_header)) {
+      bpf_printk("Error: Failed to parse VLAN header\n");
       return XDP_DROP;
     }
 
@@ -111,12 +104,14 @@ int xdp_l2_process(struct xdp_md *ctx) {
     bpf_printk("Debug: Single VLAN detected, ID: %d\n", vlan_tci);
 
     if (!header_next(ctx, vlan_header + 1, &ether_next_data)) {
+      bpf_printk("Error: Packet too short for VLAN header\n");
       return XDP_DROP;
     }
   }
   __u32 vlan_id = 0;
   if (XDP_PASS !=
       l2_recv_vlan(ctx, in_if_config, ether_header, vlan_header, &vlan_id)) {
+    bpf_printk("Error: l2_recv_vlan failed, dropping packet\n");
     return XDP_DROP;
   }
 
@@ -125,6 +120,11 @@ int xdp_l2_process(struct xdp_md *ctx) {
 
   struct fdb_value *fdb_result = &cache->fdb_value;
   if (fdb_result->ifindex == 0) {
+    bpf_printk("Debug: FDB lookup miss for MAC %02x:%02x:%02x:%02x:%02x:%02x, "
+               "VLAN ID %d\n",
+               ether_header->h_source[0], ether_header->h_source[1],
+               ether_header->h_source[2], ether_header->h_source[3],
+               ether_header->h_source[4], ether_header->h_source[5], vlan_id);
     return fdb_flood_tag(ctx, ether_header, vlan_header, vlan_id);
   }
 
@@ -132,6 +132,8 @@ int xdp_l2_process(struct xdp_md *ctx) {
   struct iface_config_item *out_if_config_item =
       bpf_map_lookup_elem(&iface_config_map, &out_if_index);
   if (!out_if_config_item) {
+    bpf_printk("Error: Outgoing interface config not found for ifindex %d\n",
+               out_if_index);
     return XDP_DROP;
   }
   bpf_spin_lock(&out_if_config_item->lock);
@@ -210,6 +212,9 @@ int xdp_l3_process(struct xdp_md *ctx) {
 
 SEC("tc")
 int tc_ingress(struct __sk_buff *skb) {
+  bpf_printk("Debug: tc_ingress called, ingress_ifindex: %d\n",
+             skb->ingress_ifindex);
+
   void *data = (void *)(long)skb->data;
   void *data_meta = (void *)(long)skb->data_meta;
 
