@@ -66,7 +66,7 @@ static __always_inline void fdb_lookup(struct xdp_md *ctx,
   }
 
   struct fdb_key key = {};
-  __builtin_memcpy(key.mac, ether_header->h_source, 6);
+  __builtin_memcpy(key.mac, ether_header->h_dest, 6);
   key.vlan_id = (__u16)vlan_id;
 
   struct fdb_value_item *val;

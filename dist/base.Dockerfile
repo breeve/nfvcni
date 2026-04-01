@@ -12,6 +12,19 @@ RUN apt-get install -y wget && \
 ENV PATH=$PATH:/usr/local/go/bin
 
 # tools
-RUN apt-get install -y make
-RUN apt-get install -y vim
+RUN apt-get install -y \
+    make \
+    vim \
+    git \
+    jq \
+    psmisc
 
+# network tools
+RUN apt-get install -y \
+    iproute2 \
+    net-tools \
+    tcpdump \
+    iputils-ping \
+    curl \
+    ethtool \
+    iperf3

@@ -143,4 +143,9 @@ struct {
         },
 };
 
+static __always_inline void print_mac(const unsigned char *mac) {
+  bpf_printk("MAC addr: %02x:%02x:%02x:", mac[0], mac[1], mac[2]);
+  bpf_printk("%02x:%02x:%02x\n", mac[3], mac[4], mac[5]);
+}
+
 #endif

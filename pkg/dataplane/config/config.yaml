@@ -4,3 +4,8 @@ ports:
     l2:
       vlanMode: "access"
       vlanId: 0
+  - name: "eth1"
+    mode: "l2"
+    l2:
+      vlanMode: "access"
+      vlanId: 0

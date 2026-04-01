@@ -80,6 +80,11 @@ int xdp_l2_process(struct xdp_md *ctx) {
     return XDP_DROP;
   }
 
+  bpf_printk("Source ");
+  print_mac(ether_header->h_source);
+  bpf_printk("Dest ");
+  print_mac(ether_header->h_dest);
+
   // 2. vlan
   // vlan_tci: parse from pkt.
   // vlan_id: VLAN Scope ID.

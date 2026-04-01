@@ -170,7 +170,7 @@ func formatFdbTables(m *ebpf.Map) (string, error) {
 
 	iter := m.Iterate()
 	for iter.Next(&key, &val) {
-		msg := fmt.Sprintf("\t%s, %d => %d, %d\n", key.Mac, key.VlanId, val.Value.Ifindex, val.Value.LastSeen)
+		msg := fmt.Sprintf("%s, %d => %d, %d", net.HardwareAddr(key.Mac[:6]).String(), key.VlanId, val.Value.Ifindex, val.Value.LastSeen)
 		sb.WriteString(msg)
 	}
 
