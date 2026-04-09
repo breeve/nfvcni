@@ -39,7 +39,7 @@ project-docs
 > 规则：所有Agent在工作时应遵守 agent-rules 定义
 
 ### 读取阶段
-1. **创建目录**：确保 `.tmp/ai/` 目录存在（如不存在则创建）
+1. **创建目录**：确保 `.ai/.tmp/ai/` 目录存在（如不存在则创建）
 2. **识别格式**：根据文件扩展名或内容特征识别文档格式
 3. **内容读取**：使用合适的读取方式获取完整内容
 4. **预处理**：处理编码问题、特殊字符、转义字符等
@@ -53,7 +53,7 @@ project-docs
 1. **Markdown生成**：生成标准Markdown格式
 2. **元数据整理**：整理并输出文件元数据
 3. **质量检查**：检查输出内容完整性
-4. **保存输出**：将Markdown文件保存到项目根目录下的 `docs/ai/` 目录
+4. **保存输出**：将Markdown文件保存到 `.ai/docs/ai/` 目录
 5. **提交审查**：调用Reviewer Agent对输出内容进行审查
 
 ## 支持的文件格式
@@ -103,7 +103,7 @@ project-docs
 ## 输出要求
 
 ### 输出目录
-- 所有Markdown输出文件必须保存到项目根目录下的 `docs/ai/` 目录
+- 所有Markdown输出文件必须保存到 `.ai/docs/ai/` 目录
 - 文件命名规范：使用英文命名，遵循kebab-case（如 `analysis-report.md`）
 - 如果目录不存在，需要先创建目录
 
@@ -150,7 +150,7 @@ size: 文件大小
 完成文档处理后，返回：
 - **source_files**：处理的文件列表及格式类型
 - **output_format**：输出格式说明
-- **output_path**：输出文件保存路径（docs/ai/目录下）
+- **output_path**：输出文件保存路径（.ai/docs/ai/目录下）
 - **conversion_result**：转换结果摘要
 - **review_result**：Reviewer审查结果（approve/needs_modification/reject）
 - **review_feedback**：审查反馈内容

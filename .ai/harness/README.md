@@ -36,11 +36,11 @@ harness/
 
 | 英文标识 | 中文名 | 职责 | 输出位置 |
 |----------|--------|------|----------|
-| `search` | 搜索研究员 | 搜索和信息收集任务 | `.tmp/ai/` |
-| `engineering` | 工程协调者 | 协调多个子代理完成复杂任务 | `.tmp/ai/` |
-| `system-planner` | 系统规划师 | 功能分解、需求分析、API设计、技术架构设计 | `.tmp/ai/` |
-| `project-reviewer` | 方案评审员 | 审查工作提案和输出内容 | `.tmp/ai/` |
-| `project-docs` | 文档处理员 | 读取各种格式文件，转换为Markdown | `docs/ai/` |
+| `search` | 搜索研究员 | 搜索和信息收集任务 | `.ai/.tmp/ai/` |
+| `engineering` | 工程协调者 | 协调多个子代理完成复杂任务 | `.ai/.tmp/ai/` |
+| `system-planner` | 系统规划师 | 功能分解、需求分析、API设计、技术架构设计 | `.ai/.tmp/ai/` |
+| `project-reviewer` | 方案评审员 | 审查工作提案和输出内容 | `.ai/.tmp/ai/` |
+| `project-docs` | 文档处理员 | 读取各种格式文件，转换为Markdown | `.ai/docs/ai/` |
 
 ## Skill 列表
 
