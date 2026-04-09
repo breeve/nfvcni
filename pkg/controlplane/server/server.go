@@ -88,10 +88,15 @@ func (s *Server) handleFdb(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	entries, err := s.dpClient.GetFdbTable(ctx)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	var entries []*types.FdbEntry
+	var err error
+
+	if s.dpClient != nil {
+		entries, err = s.dpClient.GetFdbTable(ctx)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if entries == nil {
@@ -105,8 +110,9 @@ func (s *Server) handleFdb(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	w.Write([]byte(`{"status":"ok"}`))
 }
 
 func (s *Server) listPorts(w http.ResponseWriter, r *http.Request) {
@@ -132,6 +138,10 @@ func (s *Server) addPort(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.configMgr.AddPort(portCfg.Name, &portCfg); err != nil {
+		if customErr, ok := err.(*types.Error); ok && customErr.Code == types.ErrCodeAlreadyExists {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

@@ -91,5 +91,5 @@ func (c *dataplaneClient) delFdbEntryInternal(ctx context.Context, mac string, v
 }
 
 func (c *dataplaneClient) getFdbTableInternal(ctx context.Context) ([]*types.FdbEntry, error) {
-	return nil, nil
+	return []*types.FdbEntry{}, nil
 }
