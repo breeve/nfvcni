@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package dataplane;
+
+option go_package = "github.com/breeve/nfvcni/pkg/dataplane/server/proto";
+
+service DataplaneService {
+    rpc AttachPort(AttachPortRequest) returns (AttachPortResponse);
+    rpc DetachPort(DetachPortRequest) returns (DetachPortResponse);
+    rpc AddFdbEntry(AddFdbEntryRequest) returns (AddFdbEntryResponse);
+    rpc DelFdbEntry(DelFdbEntryRequest) returns (DelFdbEntryResponse);
+    rpc GetFdbTable(GetFdbTableRequest) returns (GetFdbTableResponse);
+    rpc GetPortConfig(GetPortConfigRequest) returns (GetPortConfigResponse);
+    rpc UpdatePortConfig(UpdatePortConfigRequest) returns (UpdatePortConfigResponse);
+}
+
+message AttachPortRequest {
+    uint32 ifindex = 1;
+    PortConfig config = 2;
+}
+
+message AttachPortResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message DetachPortRequest {
+    uint32 ifindex = 1;
+}
+
+message DetachPortResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message AddFdbEntryRequest {
+    string mac = 1;
+    uint32 vlan_id = 2;
+    uint32 ifindex = 3;
+}
+
+message AddFdbEntryResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message DelFdbEntryRequest {
+    string mac = 1;
+    uint32 vlan_id = 2;
+}
+
+message DelFdbEntryResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message GetFdbTableRequest {}
+
+message GetFdbTableResponse {
+    repeated FdbEntry entries = 1;
+}
+
+message FdbEntry {
+    string mac = 1;
+    uint32 vlan_id = 2;
+    uint32 ifindex = 3;
+    int64 last_seen = 4;
+}
+
+message PortConfig {
+    string name = 1;
+    string mode = 2;
+    L2PortConfig l2 = 3;
+}
+
+message L2PortConfig {
+    string vlan_mode = 1;
+    uint32 vlan_id = 2;
+    uint32 start_vlan_id = 3;
+    uint32 end_vlan_id = 4;
+}
+
+message GetPortConfigRequest {
+    uint32 ifindex = 1;
+}
+
+message GetPortConfigResponse {
+    PortConfig config = 1;
+    string error = 2;
+}
+
+message UpdatePortConfigRequest {
+    uint32 ifindex = 1;
+    PortConfig config = 2;
+}
+
+message UpdatePortConfigResponse {
+    bool success = 1;
+    string error = 2;
+}
