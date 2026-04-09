@@ -30,12 +30,15 @@
 | 8  | DCP: Revisiting RDMA Reliability for Lossy Fabrics             | SIGCOMM     | 2025     | <https://blog.csdn.net/singgel/article/details/152935829>                                      | ✅      |
 | 9  | AQDC: Adaptive Quick Detection and Control for RDMA            | INFOCOM     | 2024     | <https://ieeexplore.ieee.org/document/>                                                        | ✅      |
 | 10 | Salvo: Closing the Latency-Rate Gap in RDMA                    | NSDI        | 2023     | <https://www.usenix.org/legacy/events/nsdi23/tech/>                                            | ✅      |
-| 11 | **RDMA over Commodity Ethernet**                               | **SIGCOMM** | **2015** | **<https://conferences.sigcomm.org/sigcomm/2015/pdf/papers/p139.pdf>**                         | **✅**  |
-| 12 | **iSwitch: Hardware-Accelerated RDMA Communication**           | **SIGCOMM** | **2015** | **<https://www.microsoft.com/en-us/research/wp-content/uploads/2016/11/rdma_sigcomm2016.pdf>** | **✅**  |
-| 13 | **RDMA at Scale in Azure**                                     | **SIGCOMM** | **2019** | **- (引用自nsdi19-kim.pdf)**                                                                      | **✅**  |
-| 14 | **Accelerating Distributed ML Training with RDMA**             | **NSDI**    | **2019** | **https://www.usenix.org/system/files/nsdi19-kim.pdf**                                       | **✅**  |
-| 15 | **Learning in-Network Congestion Control**                     | **SIGCOMM** | **2022** | **https://dl.acm.org/doi/epdf/10.1145/3544216.3544238**                                      | **⚠️**  |
-| 16 | **Cloud-Scale Acceleration Architecture**                      | **微软白皮书** | **2016** | **https://www.microsoft.com/en-us/research/wp-content/uploads/2016/10/Cloud-Scale-Acceleration-Architecture.pdf** | **✅**  |
+| 11 | **RDMA over Commodity Ethernet**                               | **SIGCOMM** | **2015** | **https://conferences.sigcomm.org/sigcomm/2015/pdf/papers/p139.pdf**                         | **✅**  |
+| 12 | **iSwitch: Hardware-Accelerated RDMA Communication**           | **SIGCOMM** | **2015** | **https://www.microsoft.com/en-us/research/wp-content/uploads/2016/11/rdma_sigcomm2016.pdf** | **✅**  |
+| 13 | **Pingmesh: Large-Scale System for DC Network Latency**        | **SIGCOMM** | **2015** | **https://www.microsoft.com/en-us/research/publication/pingmesh-large-scale-system-data-center-network-latency-measurement-analysis/** | **✅**  |
+| 14 | **FreeFlow: Software-based Virtual RDMA for Containers**        | **NSDI**    | **2019** | **https://www.ece.cmu.edu/~vsekar/assets/pdf/nsdi19_freeflow.pdf**                          | **✅**  |
+| 15 | **RDMA at Scale in Azure**                                     | **SIGCOMM** | **2019** | **- (引用自nsdi19-kim.pdf)**                                                                      | **✅**  |
+| 16 | **Accelerating Distributed ML Training with RDMA**             | **NSDI**    | **2019** | **https://www.usenix.org/system/files/nsdi19-kim.pdf**                                       | **✅**  |
+| 17 | **From Luna to Solar: Compute-to-Storage Networks in Alibaba** | **SIGCOMM** | **2022** | **https://rmiao.github.io/assets/pdf/solar-sigcomm22.pdf**                                  | **✅**  |
+| 18 | **Learning in-Network Congestion Control**                     | **SIGCOMM** | **2022** | **https://dl.acm.org/doi/epdf/10.1145/3544216.3544238**                                      | **⚠️**  |
+| 19 | **Cloud-Scale Acceleration Architecture**                      | **微软白皮书** | **2016** | **https://www.microsoft.com/en-us/research/wp-content/uploads/2016/10/Cloud-Scale-Acceleration-Architecture.pdf** | **✅**  |
 
 ### 三、大厂实践论文
 
@@ -162,5 +165,5 @@
 - **验证状态**：✅ 表示链接可访问，⚠️ 表示需要进一步验证或链接已失效
 - **按阅读顺序排列**：从基础概述 → 核心技术 → 实践案例 → 新兴技术
 - **覆盖范围**：学术界（SIGCOMM/NSDI/OSDI/ATC/INFOCOM）、工业界（阿里/谷歌/微软/Meta/DeepSeek/字节跳动）
-- **总论文数**：68篇
+- **总论文数**：72篇
 
