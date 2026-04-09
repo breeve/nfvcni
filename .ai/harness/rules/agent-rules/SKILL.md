@@ -97,7 +97,54 @@ description: Agent通用规则定义，定义Agent工作时需要遵守的规范
 5. 审查结果为reject -> 重新设计方案
 ```
 
-## 规则6：超时复盘规则
+## 规则7：标准工作流程规则
+
+**规则**：所有任务遵循统一的工作流程：规划 → 审查 → 实施 → 审查 → 文档 → 提交
+
+**说明**：
+- 流程阶段：
+  1. **规划 (Planning)**：分析需求，制定规划方案，输出 milestone 和可行性分析
+  2. **审查 I (Review I)**：提交规划方案给 Reviewer Agent 审查
+  3. **实施 (Implementation)**：根据审查通过的规划方案进行代码实现
+  4. **审查 II (Review II)**：提交实现结果给 Reviewer Agent 审查
+  5. **文档 (Documentation)**：使用 Docs Agent 记录实现文档
+  6. **提交 (Commit)**：提交代码到版本控制系统
+- 每个阶段必须完成审查通过后才能进入下一阶段
+- 审查未通过需要根据反馈调整后重新提交审查
+- 文档阶段使用 Docs Agent 生成最终文档
+- 只有用户明确要求提交时才执行提交操作
+
+**流程图**：
+```
+需求确认 → 规划 → Review I → 实施 → Review II → 文档 → 等待用户指令
+                      ↓                              ↓
+                  调整方案                        调整实现
+```
+
+**示例**：
+```
+# 任务工作流
+1. 规划阶段：分析需求，输出规划方案
+   -> .ai/.tmp/ai/feature_planning_20260101_120000.md
+
+2. 审查 I：提交规划方案给 Reviewer
+   -> .ai/.tmp/ai/review_report_feature_20260101_121000.md
+   审查结果：approve -> 继续实施
+
+3. 实施阶段：实现代码
+   -> pkg/feature implementation
+
+4. 审查 II：提交实现结果给 Reviewer
+   -> .ai/.tmp/ai/review_report_feature_20260101_130000.md
+   审查结果：approve -> 继续文档
+
+5. 文档阶段：生成最终文档 (Docs Agent)
+   -> .ai/docs/ai/feature-implementation.md
+
+6. 提交阶段：等待用户指令提交代码
+```
+
+## 规则8：超时复盘规则
 
 **规则**：任务超时后需要进行复盘分析并记录问题，避免下次重复
 
@@ -128,7 +175,7 @@ description: Agent通用规则定义，定义Agent工作时需要遵守的规范
 - [ ] 其他原因：
 
 ## 改进建议
-- 
+-
 ```
 
 **示例**：
